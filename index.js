@@ -1,8 +1,119 @@
-require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-
+require('dotenv').config();
 const token = process.env.BOT_TOKEN;
+
 const bot = new TelegramBot(token, { polling: true });
+
+bot.onText(/\/start/, (msg) => {
+  const id = msg.chat.id;
+  bot.sendMessage(id, 'Привет! Выбери, что ты хочешь сделать:', {
+    reply_markup: {
+      keyboard: [
+        ['🎯 Викторина', '🌐 Переводчик'],
+        ['🗣 Практика разговора', '📘 Словарь'],
+        ['🖼 Перевод по картинке']
+      ],
+      resize_keyboard: true
+    }
+  });
+});
+
+const translate = require('@vitalets/google-translate-api');
+
+bot.onText(/🌐 Переводчик/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, 'Введите слово или фразу для перевода (рус/англ):');
+  bot.once('message', async (msg) => {
+    const text = msg.text;
+
+    try {
+      const res = await translate(text, { to: detectLanguage(text) });
+      bot.sendMessage(chatId, `Перевод: ${res.text}`);
+    } catch (err) {
+      bot.sendMessage(chatId, 'Ошибка перевода. Попробуйте позже.');
+    }
+  });
+});
+
+function detectLanguage(text) {
+  // Очень простая проверка: если латиница — переводим на русский, иначе — на английский
+  return /^[a-zA-Z]/.test(text) ? 'ru' : 'en';
+}
+
+bot.onText(/🗣 Практика разговора/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, "🗣 Давай попрактикуемся в разговоре на английском! Я начну:\n\nHello! How are you today?");
+  startConversation(chatId);
+});
+
+function startConversation(chatId) {
+  const prompts = [
+    "What's your name?",
+    "Where are you from?",
+    "What do you like to do in your free time?",
+    "Do you like learning English?",
+    "What's your favorite food?"
+  ];
+
+  let step = 0;
+
+  const askNext = () => {
+    if (step < prompts.length) {
+      bot.sendMessage(chatId, prompts[step]);
+      step++;
+    } else {
+      bot.sendMessage(chatId, "Thanks for chatting with me! 🧠 Want to try another section?");
+    }
+  };
+
+  bot.on('message', (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+  
+    if (text === 'A1') {
+      bot.sendMessage(chatId, `📗 Уровень A1:\n\n${vocabulary.A1.join('\n')}`);
+    } else if (text === 'A2') {
+      bot.sendMessage(chatId, `📘 Уровень A2:\n\n${vocabulary.A2.join('\n')}`);
+    } else if (text === 'Сленг') {
+      bot.sendMessage(chatId, `📙 Американский сленг:\n\n${vocabulary.slang.join('\n')}`);
+    } else if (text === '🔙 Назад') {
+      bot.sendMessage(chatId, 'Вы вернулись в главное меню. Нажмите /start');
+    }
+  });
+  
+  const listener = (msg) => {
+    if (msg.chat.id === chatId) {
+      askNext();
+    }
+  };
+
+  bot.on('message', listener);
+
+  askNext();
+}
+
+const vocabulary = {
+  A1: ["book – книга", "apple – яблоко", "dog – собака", "go – идти", "house – дом"],
+  A2: ["travel – путешествовать", "yesterday – вчера", "often – часто", "because – потому что", "important – важный"],
+  slang: [
+    "cool – круто",
+    "bro – братан",
+    "YOLO – живём один раз",
+    "lit – офигенно, классно",
+    "ghost – игнорировать, пропасть без объяснений",
+    "no cap – честно, без вранья",
+    "sus – подозрительный (от слова suspicious)",
+    "salty – обиженный, раздражённый",
+    "flex – хвастаться",
+    "lowkey – немного, по-тихому",
+    "highkey – явно, открыто",
+    "vibe – атмосфера, настрой",
+    "cringe – неловко, стыдно",
+    "savage – жёстко, дерзко (в хорошем смысле)",
+    "slay – блистать, делать круто",
+    "ship – шипперить, хотеть пару из двух людей"
+  ]
+};
 
 const questions = {
   easy: [
