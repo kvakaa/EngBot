@@ -16,9 +16,10 @@ const mainMenu = {
   }
 };
 
-// Старт
+// Приветствие
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, 'Привет! Выбери, что хочешь сделать 👇', mainMenu);
+  const name = msg.from.first_name || "друг";
+  bot.sendMessage(msg.chat.id, `👋 Привет, ${name}!\nЯ бот для изучения английского языка. Выбери, с чего начнём:`, mainMenu);
 });
 
 // 🌐 Переводчик
@@ -28,12 +29,18 @@ bot.onText(/🌐 Переводчик/, (msg) => {
   bot.once('message', async (answer) => {
     if (answer.chat.id !== chatId) return;
     const text = answer.text;
+    const lang = /^[a-zA-Z]/.test(text) ? 'ru' : 'en';
+
     try {
-      const lang = /^[a-zA-Z]/.test(text) ? 'ru' : 'en';
-      const result = await translate(text, { to: lang });
-      bot.sendMessage(chatId, `Перевод: ${result.data[0]}`);
-    } catch {
-      bot.sendMessage(chatId, '❌ Ошибка перевода.');
+      const result = await translate(text, {
+        tld: "com",
+        to: lang
+      });
+      const translated = result.data[0];
+      bot.sendMessage(chatId, `Перевод: ${translated}`);
+    } catch (err) {
+      console.error(err);
+      bot.sendMessage(chatId, '❌ Ошибка перевода. Попробуйте позже.');
     }
   });
 });
@@ -41,7 +48,7 @@ bot.onText(/🌐 Переводчик/, (msg) => {
 // 🗣 Разговорная практика
 bot.onText(/🗣 Практика разговора/, (msg) => {
   const id = msg.chat.id;
-  bot.sendMessage(id, "🗣 Let's chat!\nHello! How are you today?");
+  bot.sendMessage(id, "🗣 Let's talk!\nHello! How are you today?");
   const prompts = [
     "What's your name?", "Where are you from?",
     "Do you like learning English?", "What's your hobby?"
@@ -51,7 +58,7 @@ bot.onText(/🗣 Практика разговора/, (msg) => {
     if (msg.chat.id === id && step < prompts.length) {
       bot.sendMessage(id, prompts[step++]);
     } else {
-      bot.sendMessage(id, "That was fun! 😎");
+      bot.sendMessage(id, "That was fun! 😎", mainMenu);
       bot.removeListener('message', listener);
     }
   };
@@ -69,8 +76,7 @@ bot.onText(/📘 Словарь/, (msg) => {
   bot.sendMessage(msg.chat.id, "Выбери категорию:", {
     reply_markup: {
       keyboard: [['A1', 'A2'], ['Сленг'], ['🔙 Назад']],
-      resize_keyboard: true,
-      one_time_keyboard: true
+      resize_keyboard: true
     }
   });
 });
@@ -79,23 +85,17 @@ bot.on('message', (msg) => {
   const id = msg.chat.id;
   const text = msg.text;
 
-  if (text === 'A1') {
-    bot.sendMessage(id, vocabulary.A1.join('\n'));
-  } else if (text === 'A2') {
-    bot.sendMessage(id, vocabulary.A2.join('\n'));
-  } else if (text === 'Сленг') {
-    bot.sendMessage(id, vocabulary.slang.join('\n'));
-  } else if (text === '🔙 Назад') {
-    bot.sendMessage(id, '↩️ Возврат в меню.', mainMenu);
-  }
+  if (text === 'A1') bot.sendMessage(id, vocabulary.A1.join('\n'));
+  else if (text === 'A2') bot.sendMessage(id, vocabulary.A2.join('\n'));
+  else if (text === 'Сленг') bot.sendMessage(id, vocabulary.slang.join('\n'));
+  else if (text === '🔙 Назад') bot.sendMessage(id, '↩️ Главное меню:', mainMenu);
 });
 
-// 🖼 Перевод по картинке
+// 🖼 Картинки
 const imageQuiz = [
   { url: "https://upload.wikimedia.org/wikipedia/commons/1/15/Red_Apple.jpg", answer: "apple" },
   { url: "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg", answer: "cat" }
 ];
-
 bot.onText(/🖼 Перевод по картинке/, (msg) => {
   const id = msg.chat.id;
   const quiz = imageQuiz[Math.floor(Math.random() * imageQuiz.length)];
@@ -110,59 +110,64 @@ bot.onText(/🖼 Перевод по картинке/, (msg) => {
   });
 });
 
-// 🎯 Викторина
+// 🎯 Викторина с 3 уровнями
 const quiz = {
   easy: [
     { q: "Переведи: «кошка»", a: "cat" },
-    { q: "Переведи: «собака»", a: "dog" },
     { q: "Переведи: «яблоко»", a: "apple" }
+  ],
+  medium: [
+    { q: "Прошедшее от «go»", a: "went" },
+    { q: "Синоним к «important»", a: "significant" }
+  ],
+  hard: [
+    { q: "Переведи: «предприниматель»", a: "entrepreneur" },
+    { q: "Переведи: «ответственность»", a: "responsibility" }
   ]
 };
 
 bot.onText(/🎯 Викторина/, (msg) => {
   bot.sendMessage(msg.chat.id, "Выбери уровень:", {
     reply_markup: {
-      keyboard: [['Easy'], ['🔙 Назад']],
-      resize_keyboard: true,
-      one_time_keyboard: true
+      keyboard: [['Easy', 'Medium', 'Hard'], ['🔙 Назад']],
+      resize_keyboard: true
     }
   });
 });
 
-bot.onText(/Easy/, (msg) => {
-  const id = msg.chat.id;
-  const questions = quiz.easy;
-  let score = 0, index = 0;
+['Easy', 'Medium', 'Hard'].forEach(level => {
+  bot.onText(new RegExp(level), (msg) => {
+    const id = msg.chat.id;
+    const list = quiz[level.toLowerCase()];
+    let score = 0, index = 0;
 
-  const ask = () => {
-    if (index < questions.length) {
-      bot.sendMessage(id, questions[index].q);
-    } else {
-      bot.sendMessage(id, `✅ Готово! Ты набрал ${score}/${questions.length}.`, mainMenu);
-    }
-  };
+    const ask = () => {
+      if (index < list.length) {
+        bot.sendMessage(id, list[index].q);
+      } else {
+        bot.sendMessage(id, `🎯 Готово! Ты набрал ${score}/${list.length}`, mainMenu);
+      }
+    };
 
-  const listener = (msg) => {
-    if (msg.chat.id !== id) return;
-    const userAnswer = msg.text.toLowerCase();
-    const correctAnswer = questions[index].a.toLowerCase();
+    const listener = (msg) => {
+      if (msg.chat.id !== id) return;
+      const answer = msg.text.toLowerCase();
+      if (answer === list[index].a.toLowerCase()) {
+        bot.sendMessage(id, "✅ Правильно!");
+        score++;
+      } else {
+        bot.sendMessage(id, `❌ Неправильно. Ответ: ${list[index].a}`);
+      }
+      index++;
+      if (index < list.length) {
+        ask();
+        bot.once('message', listener);
+      } else {
+        bot.sendMessage(id, `🎯 Результат: ${score}/${list.length}`, mainMenu);
+      }
+    };
 
-    if (userAnswer === correctAnswer) {
-      bot.sendMessage(id, "✅ Верно!");
-      score++;
-    } else {
-      bot.sendMessage(id, `❌ Неверно. Правильно: ${correctAnswer}`);
-    }
-
-    index++;
-    if (index < questions.length) {
-      ask();
-      bot.once('message', listener);
-    } else {
-      bot.sendMessage(id, `🎯 Итог: ${score}/${questions.length}`, mainMenu);
-    }
-  };
-
-  ask();
-  bot.once('message', listener);
+    ask();
+    bot.once('message', listener);
+  });
 });
