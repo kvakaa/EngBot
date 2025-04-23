@@ -6,8 +6,10 @@
   "scripts": {
     "start": "node index.js"
   },
-  "dependencies": {
-    "node-telegram-bot-api": "^0.61.0",
-    "dotenv": "^16.0.3"
-  }
+"dependencies": {
+  "node-telegram-bot-api": "^0.61.0",
+  "dotenv": "^16.0.3",
+  "@vitalets/google-translate-api": "^8.0.6"
+}
+
 }
